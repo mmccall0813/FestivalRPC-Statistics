@@ -1,0 +1,1 @@
+socket.io server / discord bot that tracks data on FestivalRPC users that opt in to analytics
