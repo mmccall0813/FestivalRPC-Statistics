@@ -17,6 +17,7 @@ const exec = async (interaction: ChatInputCommandInteraction, client: ExtendedCl
     }
 
     let allPlays: RecentTrack[] = [];
+    let name = (interaction.options.getString("name") || "");
 
     Object.keys(client.data).forEach( (songid) => {
         let stuff = client.data[songid];
@@ -24,7 +25,7 @@ const exec = async (interaction: ChatInputCommandInteraction, client: ExtendedCl
 
         stuff.plays.forEach( (p) => withSongId.push({...p, song: songid}));
 
-        allPlays = allPlays.concat(withSongId);
+        allPlays = allPlays.concat(withSongId.filter( (s) => s.id === name));
     });
 
     if(allPlays.length === 0){
@@ -34,7 +35,7 @@ const exec = async (interaction: ChatInputCommandInteraction, client: ExtendedCl
         return interaction.reply({embeds: [embed]});
     }
 
-    embed.setTitle("User Stats");
+    embed.setTitle("User Stats - " + name);
     embed.setColor("Green");
 
     let totalTime = 0;
