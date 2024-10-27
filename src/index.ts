@@ -1,22 +1,46 @@
 import fs from "fs";
 import socketio from "socket.io";
+import { StatisticsBot } from "./Bot";
+import axios from "axios";
 
 const config = JSON.parse(fs.readFileSync("./config.json").toString());
 const io = new socketio.Server();
 let debuglogs = true;
 
-interface SongPlay {
+export interface SongPlay {
     id: string,
     instrument: string,
     date: number,
     duration: number,
     difficulty: string
 }
-
-let data: {[key: string]: {plays: SongPlay[], timeplayed: number, instruments: {[key: string]: number}}} = {};
+export interface Song {
+    plays: SongPlay[],
+    timeplayed: number,
+    instruments: {
+        [key: string]: number
+    },
+    meta: {
+        tt: string,
+        au: string,
+        ry: string,
+        an: string,
+        sn: string,
+        dn: number
+    }
+}
+export interface Stats {
+    [key: string]: Song
+};
+let data: Stats = {};
 
 if(!fs.existsSync("./data")) fs.mkdirSync("data");
-if(fs.existsSync("./data/data.json")) data = JSON.parse(fs.readFileSync("./data/data.json").toString());
+if(fs.existsSync("./data/data.json")){
+    console.log("importing data...");
+    data = JSON.parse(fs.readFileSync("./data/data.json").toString());
+}
+
+const bot = new StatisticsBot(config, data, io);
 
 io.on("connection", (socket) => {
     let identified = false;
@@ -47,13 +71,21 @@ io.on("connection", (socket) => {
         status.started = Date.now();
     })
 
-    socket.on("stopSong", () => {
+    socket.on("stopSong", async () => {
         if(!status.playing) return; // whar ?
         status.playing = false;
 
         if(!data[status.song]){
-            data[status.song] = {plays: [], instruments: {}, timeplayed: 0};
+            let sparktracks = await axios.get("https://fortnitecontent-website-prod07.ol.epicgames.com/content/api/pages/fortnite-game/spark-tracks");
+            if(!sparktracks.data[status.song]) return; // if not in sparktracks, ignore it
+
+            data[status.song] = {plays: [], instruments: {}, timeplayed: 0, meta: sparktracks.data[status.song].track};
         };
+        if(!data[status.song].meta){
+            let sparktracks = await axios.get("https://fortnitecontent-website-prod07.ol.epicgames.com/content/api/pages/fortnite-game/spark-tracks");
+
+            data[status.song].meta = sparktracks.data[status.song].track;
+        }
 
         data[status.song].plays.push(
             {
