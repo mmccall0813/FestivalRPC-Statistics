@@ -60,14 +60,31 @@ const exec = async (interaction: ChatInputCommandInteraction, client: ExtendedCl
     let recentString = "";
 
     recent.forEach( (play) => {
-        recentString += `<t:${Math.floor(play.date / 1000)}:R> Played ${client.data[play.song].meta.tt} on ${play.difficulty} ${play.instrument} for ${play.duration} seconds\n`;
+        recentString += `<t:${Math.floor(play.date / 1000)}:R> Played **${client.data[play.song].meta.tt}** on **${play.difficulty} ${play.instrument}** for **${play.duration}** seconds\n`;
     });
+
+    let playcounts: {[key: string]: number} = {};
+
+    allPlays.forEach( (t) => playcounts[t.song] ? playcounts[t.song]++ : playcounts[t.song] = 1 );
+
+    let playCountsArray: {song: string, plays: number}[] = [];
+
+    Object.keys(playcounts).forEach( (song) => {
+        playCountsArray.push({song: song, plays: playcounts[song]});
+    })
+
+    playCountsArray.sort( (a, b) => b.plays - a.plays );
+
+    let topSongs = "";
+
+    playCountsArray.slice(0, 5).forEach( (a) => topSongs += `**${client.data[a.song].meta.tt}** by **${client.data[a.song].meta.an}** - **${a.plays}** Plays\n`);
 
     embed.addFields([
         {"name": "Total Song Plays", value: `${allPlays.length}`},
         {"name": "Total Time Spent Playing Songs", value: `${Math.floor(totalTime / 3600)}h ${Math.floor((totalTime % 3600) / 60)}m ${totalTime % 60}s`},
         {"name": "Instrument Play Count", value: instrumentBreakdown},
-        {"name": "Recent Tracks", value: recentString}
+        {"name": "Recent Tracks", value: recentString},
+        {"name": "Top Tracks", value: topSongs}
     ]);
 
     interaction.reply({embeds: [embed]});    
