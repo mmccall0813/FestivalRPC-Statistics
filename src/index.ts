@@ -2,10 +2,19 @@ import fs from "fs";
 import socketio from "socket.io";
 import { StatisticsBot } from "./Bot";
 import axios from "axios";
+import express from "express";
+import http from "http";
+import path from "path";
 
 const config = JSON.parse(fs.readFileSync("./config.json").toString());
-const io = new socketio.Server();
+const app = express();
+const server = http.createServer(app);
+const io = new socketio.Server(server);
 let debuglogs = true;
+
+app.get("/data.json", (req, res) => {
+    res.sendFile(path.resolve("./data/data.json"));
+})
 
 export interface SongPlay {
     id: string,
@@ -111,4 +120,4 @@ io.on("connection", (socket) => {
     }, 5000);
 })
 
-io.listen(8924)
+server.listen(8924)
