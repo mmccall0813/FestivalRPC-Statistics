@@ -2,3 +2,5 @@
 /data
 /node_modules
 /out
+/deviceAuth.json
+/log.txt

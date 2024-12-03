@@ -1,6 +1,7 @@
 import fs from "fs";
 import socketio from "socket.io";
 import { StatisticsBot } from "./Bot";
+const { Client } = require('fnbr');
 import axios from "axios";
 import express from "express";
 import http from "http";
@@ -14,7 +15,33 @@ let debuglogs = true;
 
 app.get("/data.json", (req, res) => {
     res.sendFile(path.resolve("./data/data.json"));
-})
+});
+
+(async () => {
+    let auth;
+    try {
+      auth = { deviceAuth: JSON.parse(fs.readFileSync('./deviceAuth.json').toString()) };
+    } catch (e) {
+      auth = { authorizationCode: async () => Client.consoleQuestion('Please enter an authorization code: ') };
+    }
+  
+    const client = new Client({ auth });
+  
+    client.on('deviceauth:created', (da: any) => fs.writeFileSync('./deviceAuth.json', JSON.stringify(da, null, 2)));
+  
+    await client.login();
+    console.log(`Logged in as ${client.user.self.displayName}`);
+
+    app.get("/island-code", async (req, res) => {
+        if(typeof req.query.code !== "string") return;
+        try {
+            let data = await client.getCreativeIsland(req.query.code);
+            res.json(data);
+        } catch(err){
+            res.sendStatus(404);
+        }
+    });
+})();
 
 export interface SongPlay {
     id: string,
@@ -41,6 +68,9 @@ export interface Song {
 export interface Stats {
     [key: string]: Song
 };
+
+
+
 let data: Stats = {};
 
 if(!fs.existsSync("./data")) fs.mkdirSync("data");
@@ -84,16 +114,24 @@ io.on("connection", (socket) => {
         if(!status.playing) return; // whar ?
         status.playing = false;
 
-        if(!data[status.song]){
-            let sparktracks = await axios.get("https://fortnitecontent-website-prod07.ol.epicgames.com/content/api/pages/fortnite-game/spark-tracks");
-            if(!sparktracks.data[status.song]) return; // if not in sparktracks, ignore it
+        try {
+            if(!data[status.song]){
+                let sparktracks = await axios.get("https://fortnitecontent-website-prod07.ol.epicgames.com/content/api/pages/fortnite-game/spark-tracks");
+                let tracks: {[key: string]: any} = {};
 
-            data[status.song] = {plays: [], instruments: {}, timeplayed: 0, meta: sparktracks.data[status.song].track};
-        };
-        if(!data[status.song].meta){
-            let sparktracks = await axios.get("https://fortnitecontent-website-prod07.ol.epicgames.com/content/api/pages/fortnite-game/spark-tracks");
+                Object.values(sparktracks.data).forEach( (track) => {
+                    if(typeof track === "object" && !Array.isArray(track)){
+                        let song = track as any;
+                        tracks[song.track.sn.toLowerCase()] = song;
+                    }
+                });
+                if(!tracks[status.song]) return; // if not in sparktracks, ignore it
 
-            data[status.song].meta = sparktracks.data[status.song].track;
+                data[status.song] = {plays: [], instruments: {}, timeplayed: 0, meta: tracks[status.song].track};
+            };
+        } catch(err){
+            console.log("Error when getting song meta..." + err);
+            return;
         }
 
         data[status.song].plays.push(
